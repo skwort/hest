@@ -1,0 +1,3 @@
+[submodule "lib/xmpp-rs"]
+	path = lib/xmpp-rs
+	url = https://gitlab.com/xmpp-rs/xmpp-rs.git
