@@ -44,10 +44,18 @@ async fn main() {
     router.handlers.push(Box::new(eh));
 
     // Create the XMPP client
-    let jid = BareJid::from_str(&config.transport.xmpp.jid).unwrap();
-    let password = "default";
+    let jid = BareJid::from_str(&config.transport.xmpp.jid).unwrap_or_else(|e| {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    });
+
+    let password = config::resolve_password(&config).unwrap_or_else(|e| {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    });
+
     let nick = RoomNick::from_str(&config.transport.xmpp.nick).unwrap();
-    let mut client = ClientBuilder::new(jid, password)
+    let mut client = ClientBuilder::new(jid, &password)
         .set_client(ClientType::Bot, &config.transport.xmpp.nick)
         .set_default_nick(nick)
         .build();
