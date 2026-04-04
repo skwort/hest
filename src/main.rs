@@ -1,5 +1,8 @@
+mod config;
 mod handler;
 mod handlers;
+
+use config::Config;
 
 use handler::{Action, Message, Router};
 use handlers::EchoHandler;
@@ -16,6 +19,12 @@ use std::str::FromStr;
 #[tokio::main]
 async fn main() {
     env_logger::init();
+
+    // Load the config
+    let config = config::load().unwrap_or_else(|e| {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    });
 
     // XMPP uses TLS; here we setup the crypto provider to enable TLS.
     rustls::crypto::aws_lc_rs::default_provider()
@@ -35,11 +44,11 @@ async fn main() {
     router.handlers.push(Box::new(eh));
 
     // Create the XMPP client
-    let jid = BareJid::from_str("hest@xmpp.skwort.dev").unwrap();
+    let jid = BareJid::from_str(&config.transport.xmpp.jid).unwrap();
     let password = "default";
-    let nick = RoomNick::from_str("hest").unwrap();
+    let nick = RoomNick::from_str(&config.transport.xmpp.nick).unwrap();
     let mut client = ClientBuilder::new(jid, password)
-        .set_client(ClientType::Bot, "hest")
+        .set_client(ClientType::Bot, &config.transport.xmpp.nick)
         .set_default_nick(nick)
         .build();
 
@@ -49,7 +58,7 @@ async fn main() {
         tokio::select! {
             events = client.wait_for_events() => {
                 for event in events {
-                    handle_events(&router, &mut client, event).await
+                    handle_events(&config, &router, &mut client, event).await
                 }
             },
             _ = ctrl_c() => {
@@ -61,18 +70,30 @@ async fn main() {
     }
 }
 
-async fn handle_events(router: &Router, client: &mut Agent, event: Event) {
+async fn handle_events(config: &Config, router: &Router, client: &mut Agent, event: Event) {
     match event {
         Event::Online => {
             log::info!("Online.");
-            log::info!("Joining Home");
-            let room = BareJid::from_str("home@conference.xmpp.skwort.dev").unwrap();
-            client
-                .join_room(JoinRoomSettings {
-                    status: Some(("en", "At your behest.")),
-                    ..JoinRoomSettings::new(room.clone())
-                })
-                .await;
+            if let Some(rooms) = &config.transport.xmpp.rooms {
+                for room in rooms {
+                    match BareJid::from_str(room) {
+                        Ok(jid) => {
+                            client
+                                .join_room(JoinRoomSettings {
+                                    status: Some((
+                                        "en",
+                                        config.transport.xmpp.room_status.as_deref().unwrap_or(""),
+                                    )),
+                                    ..JoinRoomSettings::new(jid.clone())
+                                })
+                                .await;
+                        }
+                        Err(e) => {
+                            log::error!("Requested room {} is not a valid JID: {e}", room);
+                        }
+                    }
+                }
+            }
         }
         Event::Disconnected(e) => {
             log::info!("Disconnected: {}.", e);
