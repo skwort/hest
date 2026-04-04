@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+directories = "6.0.0"
 env_logger = "0.11.10"
 log = "0.4.29"
 rustls = "0.23.37"
+serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-xmpp = { path = "lib/xmpp-rs/tokio-xmpp" }
+toml = "1.1.2"
 xmpp = { path = "lib/xmpp-rs/xmpp" }
