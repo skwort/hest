@@ -1,7 +1,6 @@
 /// A message.
 pub struct Message {
     pub body: String,
-    #[allow(dead_code)]
     pub from: String,
 }
 
@@ -14,7 +13,6 @@ pub enum Action {
 // A trait is essentially an interface
 pub trait Handler {
     /// Return the name of the handler. Useful for logging.
-    #[allow(dead_code)]
     fn name(&self) -> &str;
 
     /// Returns true if this handler wants to process this message
@@ -40,6 +38,7 @@ impl Router {
                 // NOTE: First handler wins for the time being. If we decide
                 //       to implement some kind of multicast pattern, then
                 //       we could consider collecting Actions instead.
+                log::debug!("{} wants message \"{}\"", handler.name(), msg.body);
                 return handler.process(msg);
             }
         }
