@@ -5,7 +5,7 @@ mod handlers;
 use config::Config;
 
 use handler::{Action, Message, Router};
-use handlers::EchoHandler;
+use handlers::{EchoHandler, ReminderHandler};
 
 use xmpp::jid::BareJid;
 use xmpp::message::send::MessageSettings;
@@ -42,6 +42,10 @@ async fn main() {
     // Box the handler and push it to the router's dispatch table.
     // This takes ownership of eh.
     router.handlers.push(Box::new(eh));
+    router
+        .handlers
+        // TODO: Use a path specified in the Config structure
+        .push(Box::new(ReminderHandler::new("/tmp/")));
 
     // Create the XMPP client
     let jid = BareJid::from_str(&config.transport.xmpp.jid).unwrap_or_else(|e| {
