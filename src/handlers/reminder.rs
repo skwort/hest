@@ -295,8 +295,10 @@ fn parse_command(args: &str) -> Result<ReminderCommand, String> {
             Ok(ReminderCommand::Delete { id: id.to_string() })
         }
         Some(&_) => Err("Invalid argument".to_string()),
-        // TODO: Replace with real help message
-        None => Err("help_message".to_string()),
+        None => Err(
+            "Usage: @reminder <add <YYYY-MM-DD> <HH:MM> <message> | list | delete <id>>"
+                .to_string(),
+        ),
     }
 }
 
