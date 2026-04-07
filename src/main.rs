@@ -26,6 +26,8 @@ async fn main() {
         std::process::exit(1);
     });
 
+    let handler_config = &config.handler;
+
     // XMPP uses TLS; here we setup the crypto provider to enable TLS.
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
@@ -36,16 +38,18 @@ async fn main() {
         handlers: Vec::new(),
     };
 
-    // Create the handler
-    let eh = EchoHandler;
+    // Box the handlers and push them to the router's dispatch table.
+    router.handlers.push(Box::new(EchoHandler));
 
-    // Box the handler and push it to the router's dispatch table.
-    // This takes ownership of eh.
-    router.handlers.push(Box::new(eh));
-    router
-        .handlers
-        // TODO: Use a path specified in the Config structure
-        .push(Box::new(ReminderHandler::new("/tmp/")));
+    if handler_config.reminder.enabled {
+        router.handlers.push(Box::new(ReminderHandler::new(
+            handler_config
+                .reminder
+                .data_dir
+                .as_ref()
+                .expect("data_dir should be defaulted in load()"),
+        )));
+    }
 
     // Create the XMPP client
     let jid = BareJid::from_str(&config.transport.xmpp.jid).unwrap_or_else(|e| {

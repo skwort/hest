@@ -4,7 +4,21 @@ use serde::Deserialize;
 
 #[derive(Deserialize)] // Source generation attribute: "Derive" the impl.
 pub struct Config {
+    #[serde(default)]
+    pub handler: HandlerConfig,
     pub transport: TransportConfig,
+}
+
+#[derive(Deserialize, Default)]
+pub struct HandlerConfig {
+    pub reminder: ReminderHandlerConfig,
+}
+
+#[derive(Deserialize, Default)]
+pub struct ReminderHandlerConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    pub data_dir: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -29,7 +43,25 @@ pub fn load() -> Result<Config, String> {
         .map_err(|e| format!("{}: {}", config_path.display(), e))?;
 
     // Return Config if there is no error, else error String
-    toml::from_str(&contents).map_err(|e| e.to_string())
+    let mut config: Config = toml::from_str(&contents).map_err(|e| e.to_string())?;
+    set_defaults(&dirs, &mut config);
+    Ok(config)
+}
+
+fn set_defaults(dirs: &ProjectDirs, config: &mut Config) {
+    // Set reminder config defaults.
+    //
+    // An interesting thing here is the use of the get_or_insert* functions.
+    // get_or_insert leaves the value unchanged if Some, or sets it to the
+    // provided value if None. The _with variant takes a closure.
+
+    let reminder = &mut config.handler.reminder;
+    reminder.data_dir.get_or_insert_with(|| {
+        dirs.data_dir()
+            .join("reminder")
+            .to_string_lossy()
+            .into_owned()
+    });
 }
 
 pub fn resolve_password(config: &Config) -> Result<String, String> {
@@ -56,4 +88,8 @@ pub fn resolve_password(config: &Config) -> Result<String, String> {
             s
         })
         .map_err(|e| format!("{}: {}", &config.transport.xmpp.password_file, e))
+}
+
+fn default_true() -> bool {
+    true
 }
