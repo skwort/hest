@@ -14,11 +14,19 @@ pub struct HandlerConfig {
     pub reminder: ReminderHandlerConfig,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize)]
 pub struct ReminderHandlerConfig {
-    #[serde(default = "default_true")]
     pub enabled: bool,
     pub data_dir: Option<String>,
+}
+
+impl Default for ReminderHandlerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            data_dir: None,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -88,8 +96,4 @@ pub fn resolve_password(config: &Config) -> Result<String, String> {
             s
         })
         .map_err(|e| format!("{}: {}", &config.transport.xmpp.password_file, e))
-}
-
-fn default_true() -> bool {
-    true
 }
