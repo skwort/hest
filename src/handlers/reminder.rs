@@ -175,6 +175,14 @@ pub struct ReminderHandler {
 
 impl ReminderHandler {
     pub fn new(data_dir: &str) -> Self {
+        // Create the data dir if it doesn't exist
+        match std::fs::create_dir_all(data_dir) {
+            Ok(()) => {
+                log::info!("Reminder handler data dir: {}", data_dir)
+            }
+            Err(e) => log::warn!("{}", e),
+        }
+
         let path = std::path::PathBuf::from(data_dir).join("reminders.jsonl");
         Self {
             store: RefCell::new(ReminderStore::load(&path.to_string_lossy())),
