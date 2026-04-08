@@ -8,6 +8,9 @@ pub struct Message {
 pub enum Action {
     /// The handler wants to reply directly to the received message
     Reply(String),
+
+    /// The handler wants to send a message
+    Send { to: String, body: String },
 }
 
 // A trait is essentially an interface
@@ -20,6 +23,11 @@ pub trait Handler {
 
     /// Process this message into an Action
     fn process(&self, msg: &Message) -> Vec<Action>;
+
+    /// Let the handler report any asynchronous actions
+    fn tick(&self) -> Vec<Action> {
+        vec![]
+    }
 }
 
 /// The message router

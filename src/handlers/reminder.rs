@@ -112,8 +112,8 @@ impl ReminderStore {
         Ok(())
     }
 
-    pub fn remove(&mut self, id: &str) -> Result<(), String> {
-        match self.reminders.get(id) {
+    pub fn remove(&mut self, id: &str) -> Result<Reminder, String> {
+        match self.reminders.remove(id) {
             Some(reminder) => {
                 self.append(&reminder.tombstone())?;
                 log::info!(
@@ -122,7 +122,7 @@ impl ReminderStore {
                     &reminder.message
                 );
                 self.reminders.remove(id);
-                Ok(())
+                Ok(reminder)
             }
             None => Err(format!("reminder for {} does not exist", id)),
         }
@@ -253,11 +253,39 @@ impl Handler for ReminderHandler {
                 }
             }
             Ok(ReminderCommand::Delete { id }) => match self.store.borrow_mut().remove(&id) {
-                Ok(()) => vec![Action::Reply(format!("Reminder {} deleted.", id))],
+                Ok(_) => vec![Action::Reply(format!("Reminder {} deleted.", id))],
                 Err(e) => vec![Action::Reply(e)],
             },
             Err(e) => vec![Action::Reply(e)],
         }
+    }
+
+    fn tick(&self) -> Vec<Action> {
+        let now = Local::now();
+
+        let due_reminders: Vec<String> = self
+            .store
+            .borrow()
+            .list()
+            .filter(|r| r.due <= now)
+            .map(|r| r.id.clone())
+            .collect();
+
+        let mut actions = vec![];
+        for id in due_reminders {
+            match self.store.borrow_mut().remove(&id) {
+                Ok(rem) => {
+                    actions.push(Action::Send {
+                        to: rem.to,
+                        body: rem.message,
+                    });
+                }
+                // TODO: Should this return a Send?
+                Err(_) => log::error!("failed to remove reminder"),
+            }
+        }
+
+        actions
     }
 }
 

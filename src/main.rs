@@ -13,6 +13,7 @@ use xmpp::muc::room::JoinRoomSettings;
 use xmpp::{Agent, ClientBuilder, ClientType, Event, RoomNick};
 
 use tokio::signal::ctrl_c;
+use tokio::time::Duration;
 
 use std::str::FromStr;
 
@@ -42,6 +43,7 @@ async fn main() {
     router.handlers.push(Box::new(EchoHandler));
 
     if handler_config.reminder.enabled {
+        log::info!("Creating reminder handler");
         router.handlers.push(Box::new(ReminderHandler::new(
             handler_config
                 .reminder
@@ -70,6 +72,14 @@ async fn main() {
 
     log::info!("Connecting...");
 
+    let mut tick = tokio::time::interval(Duration::from_secs(10));
+
+    // TODO: We should abstract the transport away from main. There's no reason
+    //       to couple directly to XMPP. We should instead couple to a Transport
+    //       trait. Transports would take a mpsc tx handle on some start/run
+    //       method. Then instead of client.wait_for_events(), we just call
+    //       recv asgainst our mpsc rx handle. The send path would use a send()
+    //       method on the trait.
     loop {
         tokio::select! {
             events = client.wait_for_events() => {
@@ -77,6 +87,26 @@ async fn main() {
                     handle_events(&config, &router, &mut client, event).await
                 }
             },
+            _ = tick.tick() => {
+                log::debug!("Handler tick");
+                for handler in &router.handlers {
+                    for action in handler.tick() {
+                        match action {
+                            Action::Send { to, body } => {
+                                match BareJid::from_str(&to) {
+                                    Ok(jid) => {
+                                        client.send_message(MessageSettings::new(jid, &body)).await;
+                                    }
+                                    Err(e) => {
+                                        log::error!("Unable to Send message: {}", e);
+                                    }
+                                }
+                            }
+                            _ => panic!("Unsupported action returned from tick()"),
+                        }
+                    }
+                }
+            }
             _ = ctrl_c() => {
                 log::info!("Disconnecting...");
                 client.disconnect().await.unwrap();
@@ -156,6 +186,7 @@ async fn handle_message(router: &Router, client: &mut Agent, body: String, from:
                     .send_message(MessageSettings::new(from.clone(), &text))
                     .await
             }
-        };
+            _ => panic!("Unsupported action returned from dispatch()"),
+        }
     }
 }
